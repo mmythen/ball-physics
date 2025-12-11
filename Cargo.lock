@@ -215,6 +215,7 @@ dependencies = [
 name = "physics_sim"
 version = "0.1.0"
 dependencies = [
+ "glam",
  "macroquad",
 ]
 
