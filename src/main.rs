@@ -19,7 +19,7 @@ fn get_normal(p1: Vec2, p2: Vec2) -> Vec2 {
     }
 
     let slope = (p1.y - p2.y) / (p1.x - p2.x);
-    let perp = Vec2 { x: (slope), y: (1.0)};
+    let perp = Vec2 { x: slope, y: (1.0)};
     let mut normal = Vec2 { x: (-1.0 * slope), y: (1.0)};
 
     if perp.dot(normal) != 0.0 {
@@ -53,14 +53,21 @@ async fn main() {
     faces.push( Face { p1: vec2(screen_width(), screen_height()), p2: vec2(screen_width(), 0.0)}); // right wall
 
     let t1 = make_triangle((0.0, 0.0), (0.0, 100.0), (100.0, 0.0));
+    let t2 = make_triangle((100.0, 0.0), (200.0, 100.0), (200.0, 0.0));
+    let t3 = make_triangle((200.0, 0.0), (200.0, 100.0), (300.0, 0.0));
 
     let b1 = make_box((300.0, 100.0), (400.0, 0.0));
 
+
     faces.append(&mut t1.get_faces());
+    faces.append(&mut t2.get_faces());
+    faces.append(&mut t3.get_faces());
     faces.append(&mut b1.get_faces());
 
     boxes.push(b1);
     triangles.push(t1);
+    triangles.push(t2);
+    triangles.push(t3);
 
 
 
