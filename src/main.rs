@@ -1,14 +1,9 @@
-use std::vec;
+mod shapes;
+
 use macroquad::prelude::*;
 use glam::Vec2;
-
-
-struct Ball {
-    pos: Vec2,
-    velocity: Vec2,
-    acceleration: f32,
-}
-
+use shapes:: {Ball, Triangle, Box, Face, GetFaces};
+use crate::shapes::{make_box, make_triangle};
 
 fn reflection(v: Vec2, n: Vec2) -> Vec2 {
     //n is normal vector of reflecting surface
@@ -18,6 +13,11 @@ fn reflection(v: Vec2, n: Vec2) -> Vec2 {
 }
 
 fn get_normal(p1: Vec2, p2: Vec2) -> Vec2 {
+    //fix for vertical lines
+    if p1.x == p2.x {
+        return vec2(1.0, 0.0);
+    }
+
     let slope = (p1.y - p2.y) / (p1.x - p2.x);
     let perp = Vec2 { x: (slope), y: (1.0)};
     let mut normal = Vec2 { x: (-1.0 * slope), y: (1.0)};
@@ -28,71 +28,86 @@ fn get_normal(p1: Vec2, p2: Vec2) -> Vec2 {
     return normal;
 }
 
-fn circle_hits_triangle(c: Vec2, r: f32, a: Vec2, b: Vec2, d: Vec2) -> bool {
-    // point inside triangle
-    let inside = {
-        fn sign(p: Vec2, a: Vec2, b: Vec2) -> f32 { (p.x - b.x)*(a.y - b.y) - (a.x - b.x)*(p.y - b.y) }
-        let s1 = sign(c, a, b);
-        let s2 = sign(c, b, d);
-        let s3 = sign(c, d, a);
-        (s1 >= 0.0 && s2 >= 0.0 && s3 >= 0.0) || (s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0)
-    };
-    if inside { return true; }
+fn center_distance(c: Vec2, p1: Vec2, p2: Vec2) -> f32 {
+    let ab = p2-p1;
+    let t = ((c-p1).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
+    return c.distance(p1 + ab * t);
+}
 
-    // distance from point to segment
-    fn dist_to_seg(p: Vec2, a: Vec2, b: Vec2) -> f32 {
-        let ab = b - a;
-        let t = ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
-        p.distance(a + ab * t)
-    }
 
-    return dist_to_seg(c, a, b) <= r ||
-    dist_to_seg(c, b, d) <= r ||
-    dist_to_seg(c, d, a) <= r
+//TURN ALL COLLISIONS INTO FACE COLLISIONS
+fn face_collision(c: Vec2, r: f32, p1: Vec2, p2: Vec2) -> bool {
+    return center_distance(c, p1, p2) <= r;
 }
 
 #[macroquad::main("Gravity")]
 async fn main() {
     let mut balls: Vec<Ball> = Vec::new();
+    let mut faces: Vec<Face> = Vec::new();
+    let mut triangles: Vec<Triangle> = Vec::new();
+    let mut boxes: Vec<Box> = Vec::new();
+
+    // creating playground faces
+    faces.push( Face { p1: vec2(0.0, 0.0), p2: vec2(0.0, screen_height())}); // left wall
+    faces.push( Face { p1: vec2(screen_width(), screen_height()), p2: vec2(0.0, screen_height())}); // floor
+    faces.push( Face { p1: vec2(screen_width(), screen_height()), p2: vec2(screen_width(), 0.0)}); // right wall
+
+    let t1 = make_triangle((0.0, 0.0), (0.0, 100.0), (100.0, 0.0));
+
+    let b1 = make_box((300.0, 100.0), (400.0, 0.0));
+
+    faces.append(&mut t1.get_faces());
+    faces.append(&mut b1.get_faces());
+
+    boxes.push(b1);
+    triangles.push(t1);
+
+
 
 
     loop {
         clear_background(WHITE);
-
-        let p1 = vec2(screen_width() / 2.0, screen_height() / 1.05); //top point
-        let p2 = vec2(screen_width() / 2.0, screen_height()); //bottom 1
-        let p3 = vec2(screen_width() / 2.0 - 200.0,screen_height()); //bottom 2
-        draw_triangle(p1, p2, p3, BLUE);
+        // for tri in &triangles {
+        //     draw_triangle(tri.v1, tri.v2, tri.v3, BLUE);
+        // };
+        for face in &faces {
+            draw_line(face.p1.x, face.p1.y, face.p2.x, face.p2.y, 2.0, BLUE);
+        }
 
         if is_mouse_button_pressed(MouseButton::Left) {
             let (mouse_x, mouse_y) = mouse_position();
             balls.push(Ball {
                 pos: Vec2 { x: (mouse_x), y: (mouse_y) },
                 velocity: Vec2 { x: (0.0), y: (0.5) },
-                acceleration: 0.2
+                acceleration: 0.1
             });
         }
 
+
         for ball in &mut balls {
-            ball.velocity.y += ball.acceleration;
 
-            //check if touching floor
-            if ball.pos.y > screen_height() - 10.0 {
-                ball.pos.y = screen_height() - 10.0;
-                ball.velocity.y *= -0.8;
-
-                if ball.velocity.y > -0.01 {
-                    ball.acceleration = 0.0;
+            //check collision with all faces
+            for face in &faces {
+                if !face_collision(ball.pos, 10.0, face.p1, face.p2) {
+                    continue;
                 }
+                //stop balls from sinking into objects
+                ball.pos -= ball.velocity;
+
+
+                let mut norm = get_normal(face.p1, face.p2);
+                //fix normal vector if ball is going up
+                if ball.velocity.y > 0.0 {
+                    norm *= -1.0;
+                }
+
+                let reflect_vec = reflection(ball.velocity, norm);
+                ball.velocity = reflect_vec;
+                ball.velocity *= 0.9;
             }
 
-            //check if touching triangle
-            if circle_hits_triangle(ball.pos, 10.0, p1, p2, p3) {
-                let reflected = reflection(ball.velocity, get_normal(p1, p3));
-                ball.velocity = reflected;
-            }
-
-
+            // update ball position and display
+            ball.velocity.y += ball.acceleration;
             ball.pos += ball.velocity;
             draw_circle(ball.pos.x, ball.pos.y, 10.0, BLACK);
         }
