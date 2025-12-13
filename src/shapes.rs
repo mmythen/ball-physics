@@ -2,6 +2,7 @@ use macroquad::prelude::*;
 use glam::Vec2;
 
 pub struct Ball {
+    pub id: i32,
     pub pos: Vec2,
     pub velocity: Vec2,
     pub acceleration: f32,

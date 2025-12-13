@@ -40,12 +40,20 @@ fn face_collision(c: Vec2, r: f32, p1: Vec2, p2: Vec2) -> bool {
     return center_distance(c, p1, p2) <= r;
 }
 
+fn sphere_collision(c1: Vec2, r1: f32, c2: Vec2, r2: f32) -> bool {
+    let d = c2 - c1;
+    let dist_sq = d.length_squared();
+    let r = r1 + r2;
+    return dist_sq <= r * r;
+}
+
 #[macroquad::main("Gravity")]
 async fn main() {
     let mut balls: Vec<Ball> = Vec::new();
     let mut faces: Vec<Face> = Vec::new();
     let mut triangles: Vec<Triangle> = Vec::new();
     let mut boxes: Vec<Box> = Vec::new();
+    let mut ball_index = 0;
 
     // creating playground faces
     faces.push( Face { p1: vec2(0.0, 0.0), p2: vec2(0.0, screen_height())}); // left wall
@@ -84,16 +92,16 @@ async fn main() {
         if is_mouse_button_pressed(MouseButton::Left) {
             let (mouse_x, mouse_y) = mouse_position();
             balls.push(Ball {
+                id: ball_index,
                 pos: Vec2 { x: (mouse_x), y: (mouse_y) },
                 velocity: Vec2 { x: (0.0), y: (0.5) },
                 acceleration: 0.1
             });
+            ball_index += 1;
         }
 
-
+        // FACE COLLISION
         for ball in &mut balls {
-
-            //check collision with all faces
             for face in &faces {
                 if !face_collision(ball.pos, 10.0, face.p1, face.p2) {
                     continue;
@@ -101,22 +109,49 @@ async fn main() {
                 //stop balls from sinking into objects
                 ball.pos -= ball.velocity;
 
-
                 let mut norm = get_normal(face.p1, face.p2);
                 //fix normal vector if ball is going up
                 if ball.velocity.y > 0.0 {
                     norm *= -1.0;
                 }
-
-                let reflect_vec = reflection(ball.velocity, norm);
-                ball.velocity = reflect_vec;
+                let reflect = reflection(ball.velocity, norm);
+                ball.velocity = reflect;
                 ball.velocity *= 0.9;
             }
-
             // update ball position and display
             ball.velocity.y += ball.acceleration;
             ball.pos += ball.velocity;
             draw_circle(ball.pos.x, ball.pos.y, 10.0, BLACK);
+        }
+
+        // BALL COLLISION
+        let n = balls.len();
+        for i in 0..n {
+            for j in (i+1)..n {
+                // get all pairs of balls to check collision
+                let (one, two) = balls.split_at_mut(j);
+                let b1 = &mut one[i];
+                let b2 = &mut two[0];
+
+                if sphere_collision(b1.pos, 10.0, b2.pos, 10.0) {
+                    b1.pos -= b1.velocity;
+                    b2.pos -= b2.velocity;
+
+                    let norm1 = (b2.pos - b1.pos).normalize();
+                    let norm2 = (b1.pos - b2.pos).normalize();
+
+                    let refl1 = reflection(b1.velocity, norm1);
+                    let refl2 = reflection(b2.velocity, norm2);
+
+                    b1.velocity = refl1;
+                    b1.velocity *= 0.9;
+
+                    b2.velocity = refl2;
+                    b2.velocity *= 0.9;
+
+
+                }
+            }
         }
 
         next_frame().await;
