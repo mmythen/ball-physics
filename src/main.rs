@@ -49,6 +49,13 @@ fn sphere_collision(c1: Vec2, r1: f32, c2: Vec2, r2: f32) -> bool {
 
 #[macroquad::main("Gravity")]
 async fn main() {
+    //points for drawing faces
+    let mut pos1 = Vec2::new(0.0, 0.0);
+    let mut pos2 = Vec2::new(0.0, 0.0);
+    let mut pos_counter = 0;
+
+
+    //vecs for shapes
     let mut balls: Vec<Ball> = Vec::new();
     let mut faces: Vec<Face> = Vec::new();
     let mut triangles: Vec<Triangle> = Vec::new();
@@ -60,12 +67,11 @@ async fn main() {
     faces.push( Face { p1: vec2(screen_width(), screen_height()), p2: vec2(0.0, screen_height())}); // floor
     faces.push( Face { p1: vec2(screen_width(), screen_height()), p2: vec2(screen_width(), 0.0)}); // right wall
 
+    //making some shapes
     let t1 = make_triangle((0.0, 0.0), (0.0, 100.0), (100.0, 0.0));
     let t2 = make_triangle((100.0, 0.0), (200.0, 100.0), (200.0, 0.0));
     let t3 = make_triangle((200.0, 0.0), (200.0, 100.0), (300.0, 0.0));
-
     let b1 = make_box((300.0, 100.0), (400.0, 0.0));
-
 
     faces.append(&mut t1.get_faces());
     faces.append(&mut t2.get_faces());
@@ -82,11 +88,21 @@ async fn main() {
 
     loop {
         clear_background(WHITE);
-        // for tri in &triangles {
-        //     draw_triangle(tri.v1, tri.v2, tri.v3, BLUE);
-        // };
         for face in &faces {
             draw_line(face.p1.x, face.p1.y, face.p2.x, face.p2.y, 2.0, BLUE);
+        }
+
+        //draw faces with right click
+        if is_mouse_button_down(MouseButton::Right) {
+            if pos_counter == 0 {
+                pos1 = mouse_position().into();
+                pos_counter += 1;
+            }
+            else {
+                pos2 = mouse_position().into();
+                faces.push( Face { p1: pos1, p2: pos2 });
+                pos_counter = 0;
+            }
         }
 
         if is_mouse_button_pressed(MouseButton::Left) {
